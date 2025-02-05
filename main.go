@@ -16,7 +16,8 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 
 	"github.com/gorilla/mux"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog"
 	_ "modernc.org/sqlite"
@@ -32,7 +33,7 @@ var (
 	address     = flag.String("address", "0.0.0.0", "Bind IP Address")
 	port        = flag.String("port", "8080", "Listen Port")
 	waDebug     = flag.String("wadebug", "", "Enable whatsmeow debug (INFO or DEBUG)")
-	logType     = flag.String("logtype", "console", "Type of log output (console or json)")
+	logType     = flag.String("json", "console", "Type of log output (console or json)")
 	colorOutput = flag.Bool("color", false, "Enable colored output for console logs")
 	sslcert     = flag.String("sslcertificate", "", "SSL Certificate File")
 	sslprivkey  = flag.String("sslprivatekey", "", "SSL Certificate Private Key File")
@@ -64,7 +65,10 @@ func init() {
 }
 
 func main() {
-
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal().Msg("Error loading .env file")
+	}
 	ex, err := os.Executable()
 	if err != nil {
 		panic(err)
@@ -79,15 +83,20 @@ func main() {
 			panic("Could not create dbdata directory")
 		}
 	}
+	// Load environment variables
+	user := os.Getenv("POSTGRES_USER")
+	password := os.Getenv("POSTGRES_PASSWORD")
+	dbname := os.Getenv("POSTGRES_DB")
+	sslmode := os.Getenv("POSTGRES_SSLMODE")
 
-	db, err := sql.Open("sqlite", exPath+"/dbdata/users.db")
+	db, err := sql.Open("postgres", fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", user, password, dbname, sslmode))
 	if err != nil {
-		log.Fatal().Err(err).Msg("Could not open/create " + exPath + "/dbdata/users.db")
+		log.Fatal().Err(err).Msg("Could not open/create PostgreSQL database")
 		os.Exit(1)
 	}
 	defer db.Close()
 
-	sqlStmt := `CREATE TABLE IF NOT EXISTS users (id INTEGER NOT NULL PRIMARY KEY, name TEXT NOT NULL, token TEXT NOT NULL, webhook TEXT NOT NULL default "", jid TEXT NOT NULL default "", qrcode TEXT NOT NULL default "", connected INTEGER, expiration INTEGER, events TEXT NOT NULL default "All");`
+	sqlStmt := `CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, token TEXT NOT NULL, webhook TEXT NOT NULL default '', jid TEXT NOT NULL default '', qrcode TEXT NOT NULL default '', connected INTEGER, expiration INTEGER, events TEXT NOT NULL default 'All');`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
 		panic(fmt.Sprintf("%q: %s\n", err, sqlStmt))
@@ -95,9 +104,9 @@ func main() {
 
 	if *waDebug != "" {
 		dbLog := waLog.Stdout("Database", *waDebug, *colorOutput)
-		container, err = sqlstore.New("sqlite", "file:"+exPath+"/dbdata/main.db?_pragma=foreign_keys(1)&_busy_timeout=5000", dbLog)
+		container, err = sqlstore.New("postgres", fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", user, password, dbname, sslmode), dbLog)
 	} else {
-		container, err = sqlstore.New("sqlite", "file:"+exPath+"/dbdata/main.db?_pragma=foreign_keys(1)&_busy_timeout=5000", nil)
+		container, err = sqlstore.New("postgres", fmt.Sprintf("user=%s password=%s dbname=%s sslmode=%s", user, password, dbname, sslmode), nil)
 	}
 	if err != nil {
 		panic(err)
