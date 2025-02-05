@@ -1672,10 +1672,12 @@ func (s *server) SendMessage() http.HandlerFunc {
 
 		recipient, err := validateMessageFields(t.Phone, t.ContextInfo.StanzaID, t.ContextInfo.Participant)
 		if err != nil {
-			log.Error().Msg(fmt.Sprintf("%s", err))
+			log.Error().Msg(fmt.Sprintf("Error validateMessageFields %s", err))
 			s.Respond(w, r, http.StatusBadRequest, err)
 			return
 		}
+
+		log.Info().Msg(fmt.Sprintf("Result JID : %s Body: %s", recipient.User, t.Body))
 
 		if t.Id == "" {
 			msgid = whatsmeow.GenerateMessageID()
@@ -1707,6 +1709,7 @@ func (s *server) SendMessage() http.HandlerFunc {
 		log.Info().Msg(fmt.Sprintf("Prepare MSG Chat 2: %s", msg.Chat.String()))
 		resp, err = clientPointer[userid].SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{ID: msgid})
 		if err != nil {
+			log.Error().Msg(fmt.Sprintf("Error sending message 1: %s", err.Error()))
 			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Error sending message: %v", err)))
 			return
 		}
@@ -2954,7 +2957,7 @@ func (s *server) ListUsers() http.HandlerFunc {
 		// Query the database to get the list of users
 		rows, err := s.db.Query("SELECT id, name, token, webhook, jid, connected, expiration, events FROM users")
 		if err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New("Problem accessing DB"))
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 			return
 		}
 		defer rows.Close()
@@ -2972,7 +2975,7 @@ func (s *server) ListUsers() http.HandlerFunc {
 
 			err := rows.Scan(&id, &name, &token, &webhook, &jid, &connectedNull, &expiration, &events)
 			if err != nil {
-				s.Respond(w, r, http.StatusInternalServerError, errors.New("Problem accessing DB"))
+				s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 				return
 			}
 
@@ -2996,7 +2999,7 @@ func (s *server) ListUsers() http.HandlerFunc {
 		}
 		// Check for any error that occurred during iteration
 		if err := rows.Err(); err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New("Problem accessing DB"))
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 			return
 		}
 
@@ -3033,7 +3036,7 @@ func (s *server) AddUser() http.HandlerFunc {
 		var count int
 		err = s.db.QueryRow("SELECT COUNT(*) FROM users WHERE token = ?", user.Token).Scan(&count)
 		if err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New("Problem accessing DB"))
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 			return
 		}
 		if count > 0 {
@@ -3056,7 +3059,7 @@ func (s *server) AddUser() http.HandlerFunc {
 		result, err := s.db.Exec("INSERT INTO users (name, token, webhook, expiration, events, jid, qrcode) VALUES (?, ?, ?, ?, ?, ?, ?)",
 			user.Name, user.Token, user.Webhook, user.Expiration, user.Events, "", "")
 		if err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New("Problem accessing DB"))
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 			log.Error().Str("error", fmt.Sprintf("%v", err)).Msg("Admin DB Error")
 			return
 		}
@@ -3082,7 +3085,7 @@ func (s *server) GetUserByToken() http.HandlerFunc {
 		// Query the database to get the list of users
 		rows, err := s.db.Query("SELECT id, name, token, webhook, jid, connected, expiration, events FROM users WHERE token = ? LIMIT 1", token)
 		if err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New("Problem accessing DB"))
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 			return
 		}
 		defer rows.Close()
@@ -3092,12 +3095,12 @@ func (s *server) GetUserByToken() http.HandlerFunc {
 			var id int
 			var name, token, webhook, jid string
 			var connectedNull sql.NullInt64
-			var expiration int
+			var expiration sql.NullInt32
 			var events string
 
 			err := rows.Scan(&id, &name, &token, &webhook, &jid, &connectedNull, &expiration, &events)
 			if err != nil {
-				s.Respond(w, r, http.StatusInternalServerError, errors.New("Problem accessing DB"))
+				s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 				return
 			}
 
@@ -3113,14 +3116,14 @@ func (s *server) GetUserByToken() http.HandlerFunc {
 				"webhook":    webhook,
 				"jid":        jid,
 				"connected":  connected == 1,
-				"expiration": expiration,
+				"expiration": expiration.Int32,
 				"events":     events,
 			}
 
 		}
 		// Check for any error that occurred during iteration
 		if err := rows.Err(); err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New("Problem accessing DB"))
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 			return
 		}
 
@@ -3146,7 +3149,7 @@ func (s *server) DeleteUser() http.HandlerFunc {
 		// Delete the user from the database
 		result, err := s.db.Exec("DELETE FROM users WHERE id = ?", userID)
 		if err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New("Problem accessing DB"))
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 			return
 		}
 
