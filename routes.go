@@ -11,25 +11,6 @@ import (
 	"github.com/rs/zerolog/hlog"
 )
 
-// @title WuzAPI
-// @version 1.0
-// @description This is a sample server for WuzAPI.
-// @termsOfService http://swagger.io/terms/
-
-// @contact.name API Support
-// @contact.url http://www.swagger.io/support
-// @contact.email support@swagger.io
-
-// @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
-
-// @host localhost:8080
-// @BasePath /
-
-// @securityDefinitions.apikey ApiKeyAuth
-// @in header
-// @name Authorization
-
 type Middleware = alice.Constructor
 
 func (s *server) routes() {
@@ -49,44 +30,9 @@ func (s *server) routes() {
 
 	adminRoutes := s.router.PathPrefix("/admin").Subrouter()
 	adminRoutes.Use(s.authadmin)
-
-	// @Summary List users
-	// @Description Get all users
-	// @Tags admin
-	// @Accept  json
-	// @Produce  json
-	// @Success 200 {array} User
-	// @Router /admin/users [get]
 	adminRoutes.Handle("/users", s.ListUsers()).Methods("GET")
-
-	// @Summary Add a user
-	// @Description Add a new user
-	// @Tags admin
-	// @Accept  json
-	// @Produce  json
-	// @Param user body User true "Add user"
-	// @Success 200 {object} User
-	// @Router /admin/users [post]
 	adminRoutes.Handle("/users", s.AddUser()).Methods("POST")
-
-	// @Summary Delete a user
-	// @Description Delete a user by ID
-	// @Tags admin
-	// @Accept  json
-	// @Produce  json
-	// @Param id path int true "User ID"
-	// @Success 200 {string} string "ok"
-	// @Router /admin/users/{id} [delete]
 	adminRoutes.Handle("/users/{id}", s.DeleteUser()).Methods("DELETE")
-
-	// @Summary Get user by token
-	// @Description Get a user by token
-	// @Tags admin
-	// @Accept  json
-	// @Produce  json
-	// @Param token path string true "User Token"
-	// @Success 200 {object} User
-	// @Router /admin/users/{token} [get]
 	adminRoutes.Handle("/users/{token}", s.GetUserByToken()).Methods("GET")
 
 	c := alice.New()
