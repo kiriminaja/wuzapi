@@ -67,7 +67,7 @@ func (s *server) authalice(next http.Handler) http.Handler {
 		if !found {
 			log.Info().Msg("Looking for user information in DB")
 			// Checks DB from matching user and store user values in context
-			rows, err := s.db.Query("SELECT id,webhook,jid,events FROM users WHERE token=? LIMIT 1", token)
+			rows, err := s.db.Query("SELECT id,webhook,jid,events FROM users WHERE token=$1 LIMIT 1", token)
 			if err != nil {
 				s.Respond(w, r, http.StatusInternalServerError, err)
 				return
@@ -123,13 +123,15 @@ func (s *server) auth(handler http.HandlerFunc) http.HandlerFunc {
 
 		myuserinfo, found := userinfocache.Get(token)
 		if !found {
-			log.Info().Msg("Looking for user information in DB")
+			log.Info().Msg("Looking for user information in DB aaaa")
 			// Checks DB from matching user and store user values in context
-			rows, err := s.db.Query("SELECT id,webhook,jid,events FROM users WHERE token=? LIMIT 1", token)
+			rows, err := s.db.Query("SELECT id,webhook,jid,events FROM users WHERE token=$1 LIMIT 1", token)
+			fmt.Printf("error check user %v", rows)
 			if err != nil {
 				s.Respond(w, r, http.StatusInternalServerError, err)
 				return
 			}
+
 			defer rows.Close()
 			for rows.Next() {
 				err = rows.Scan(&txtid, &webhook, &jid, &events)
@@ -158,6 +160,7 @@ func (s *server) auth(handler http.HandlerFunc) http.HandlerFunc {
 			s.Respond(w, r, http.StatusUnauthorized, errors.New("Unauthorized"))
 			return
 		}
+
 		handler(w, r.WithContext(ctx))
 	}
 }
@@ -210,7 +213,7 @@ func (s *server) Connect() http.HandlerFunc {
 				}
 			}
 			eventstring = strings.Join(subscribedEvents, ",")
-			_, err = s.db.Exec("UPDATE users SET events=? WHERE id=?", eventstring, userid)
+			_, err = s.db.Exec("UPDATE users SET events=$1 WHERE id=$2", eventstring, userid)
 			if err != nil {
 				log.Warn().Msg("Could not set events in users table")
 			}
@@ -267,7 +270,7 @@ func (s *server) Disconnect() http.HandlerFunc {
 			if clientPointer[userid].IsLoggedIn() == true {
 				log.Info().Str("jid", jid).Msg("Disconnection successfull")
 				killchannel[userid] <- true
-				_, err := s.db.Exec("UPDATE users SET events=? WHERE id=?", "", userid)
+				_, err := s.db.Exec("UPDATE users SET events=$1 WHERE id=$1", "", userid)
 				if err != nil {
 					log.Warn().Str("userid", txtid).Msg("Could not set events in users table")
 				}
@@ -303,7 +306,7 @@ func (s *server) GetWebhook() http.HandlerFunc {
 		events := ""
 		txtid := r.Context().Value("userinfo").(Values).Get("Id")
 
-		rows, err := s.db.Query("SELECT webhook,events FROM users WHERE id=? LIMIT 1", txtid)
+		rows, err := s.db.Query("SELECT webhook,events FROM users WHERE id=$1 LIMIT 1", txtid)
 		if err != nil {
 			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Could not get webhook: %v", err)))
 			return
@@ -355,7 +358,7 @@ func (s *server) SetWebhook() http.HandlerFunc {
 		}
 		var webhook = t.WebhookURL
 
-		_, err = s.db.Exec("UPDATE users SET webhook=? WHERE id=?", webhook, userid)
+		_, err = s.db.Exec("UPDATE users SET webhook=$1 WHERE id=$1", webhook, userid)
 		if err != nil {
 			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("%s", err)))
 			return
@@ -391,7 +394,7 @@ func (s *server) GetQR() http.HandlerFunc {
 				s.Respond(w, r, http.StatusInternalServerError, errors.New("Not connected"))
 				return
 			}
-			rows, err := s.db.Query("SELECT qrcode AS code FROM users WHERE id=? LIMIT 1", userid)
+			rows, err := s.db.Query("SELECT qrcode AS code FROM users WHERE id=$1 LIMIT 1", userid)
 			if err != nil {
 				s.Respond(w, r, http.StatusInternalServerError, err)
 				return
@@ -3034,7 +3037,7 @@ func (s *server) AddUser() http.HandlerFunc {
 
 		// Check if a user with the same token already exists
 		var count int
-		err = s.db.QueryRow("SELECT COUNT(*) FROM users WHERE token = ?", user.Token).Scan(&count)
+		err = s.db.QueryRow("SELECT COUNT(*) FROM users WHERE token = $1", user.Token).Scan(&count)
 		if err != nil {
 			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 			return
@@ -3056,9 +3059,10 @@ func (s *server) AddUser() http.HandlerFunc {
 		}
 
 		// Insert the user into the database
-		result, err := s.db.Exec("INSERT INTO users (name, token, webhook, expiration, events, jid, qrcode) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		result, err := s.db.Exec("INSERT INTO users (name, token, webhook, expiration, events, jid, qrcode) VALUES ($1, $2, $3, $4, $5, $6, $7)",
 			user.Name, user.Token, user.Webhook, user.Expiration, user.Events, "", "")
 		if err != nil {
+			fmt.Printf("cek error %v", err)
 			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Problem accessing DB : %v", err)))
 			log.Error().Str("error", fmt.Sprintf("%v", err)).Msg("Admin DB Error")
 			return

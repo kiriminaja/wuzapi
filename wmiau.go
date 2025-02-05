@@ -214,14 +214,14 @@ func (s *server) startClient(userID int, textjid string, token string, subscript
 					// Store encoded/embeded base64 QR on database for retrieval with the /qr endpoint
 					image, _ := qrcode.Encode(evt.Code, qrcode.Medium, 256)
 					base64qrcode := "data:image/png;base64," + base64.StdEncoding.EncodeToString(image)
-					sqlStmt := `UPDATE users SET qrcode=? WHERE id=?`
+					sqlStmt := `UPDATE users SET qrcode=$1 WHERE id=$2`
 					_, err := s.db.Exec(sqlStmt, base64qrcode, userID)
 					if err != nil {
 						log.Error().Err(err).Msg(sqlStmt)
 					}
 				} else if evt.Event == "timeout" {
 					// Clear QR code from DB on timeout
-					sqlStmt := `UPDATE users SET qrcode=? WHERE id=?`
+					sqlStmt := `UPDATE users SET qrcode=$1 WHERE id=$2`
 					_, err := s.db.Exec(sqlStmt, "", userID)
 					if err != nil {
 						log.Error().Err(err).Msg(sqlStmt)
@@ -232,7 +232,7 @@ func (s *server) startClient(userID int, textjid string, token string, subscript
 				} else if evt.Event == "success" {
 					log.Info().Msg("QR pairing ok!")
 					// Clear QR code after pairing
-					sqlStmt := `UPDATE users SET qrcode=? WHERE id=?`
+					sqlStmt := `UPDATE users SET qrcode=$1 WHERE id=$2`
 					_, err := s.db.Exec(sqlStmt, "", userID)
 					if err != nil {
 						log.Error().Err(err).Msg(sqlStmt)
@@ -259,7 +259,7 @@ func (s *server) startClient(userID int, textjid string, token string, subscript
 			log.Info().Str("userid", strconv.Itoa(userID)).Msg("Received kill signal")
 			client.Disconnect()
 			delete(clientPointer, userID)
-			sqlStmt := `UPDATE users SET connected=0 WHERE id=?`
+			sqlStmt := `UPDATE users SET connected=0 WHERE id=$1`
 			_, err := s.db.Exec(sqlStmt, userID)
 			if err != nil {
 				log.Error().Err(err).Msg(sqlStmt)
@@ -307,7 +307,7 @@ func (mycli *MyClient) myEventHandler(rawEvt interface{}) {
 		} else {
 			log.Info().Msg("Marked self as available")
 		}
-		sqlStmt := `UPDATE users SET connected=1 WHERE id=?`
+		sqlStmt := `UPDATE users SET connected=1 WHERE id=$1`
 		_, err = mycli.db.Exec(sqlStmt, mycli.userID)
 		if err != nil {
 			log.Error().Err(err).Msg(sqlStmt)
@@ -316,7 +316,7 @@ func (mycli *MyClient) myEventHandler(rawEvt interface{}) {
 	case *events.PairSuccess:
 		log.Info().Str("userid", strconv.Itoa(mycli.userID)).Str("token", mycli.token).Str("ID", evt.ID.String()).Str("BusinessName", evt.BusinessName).Str("Platform", evt.Platform).Msg("QR Pair Success")
 		jid := evt.ID
-		sqlStmt := `UPDATE users SET jid=? WHERE id=?`
+		sqlStmt := `UPDATE users SET jid=$1 WHERE id=$2`
 		_, err := mycli.db.Exec(sqlStmt, jid, mycli.userID)
 		if err != nil {
 			log.Error().Err(err).Msg(sqlStmt)
@@ -518,7 +518,7 @@ func (mycli *MyClient) myEventHandler(rawEvt interface{}) {
 	case *events.LoggedOut:
 		log.Info().Str("reason", evt.Reason.String()).Msg("Logged out")
 		killchannel[mycli.userID] <- true
-		sqlStmt := `UPDATE users SET connected=0 WHERE id=?`
+		sqlStmt := `UPDATE users SET connected=0 WHERE id=$1`
 		_, err := mycli.db.Exec(sqlStmt, mycli.userID)
 		if err != nil {
 			log.Error().Err(err).Msg(sqlStmt)
