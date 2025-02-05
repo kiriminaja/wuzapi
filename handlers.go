@@ -1677,7 +1677,7 @@ func (s *server) SendMessage() http.HandlerFunc {
 			return
 		}
 
-		log.Info().Msg(fmt.Sprintf("Result JID : %s DEVICE: %d", recipient.User, recipient.Device))
+		log.Info().Msg(fmt.Sprintf("Result JID : %s Body: %s", recipient.User, t.Body))
 
 		if t.Id == "" {
 			msgid = whatsmeow.GenerateMessageID()
