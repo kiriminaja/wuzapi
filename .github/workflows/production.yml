@@ -11,7 +11,7 @@ env:
   ARTIFACT_HELM: "asia-southeast2-docker.pkg.dev/perfect-impulse-344607/kaj-prd-helm-package"
   APP_TAG: ${{ github.ref_name }}
   APP_PORT: 80
-  TARGET_PORT: 8081
+  TARGET_PORT: 8080
   NAMESPACE: "onpremis"
   DOMAIN: "wuzapi.kiriminaja.com"
   GREEN_DOMAIN: "green-wuzapi.kiriminaja.com"
