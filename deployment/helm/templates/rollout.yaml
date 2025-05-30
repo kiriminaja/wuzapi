@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ .Values.deployment.name }}
+  namespace: {{ .Values.deployment.namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.deployment.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.deployment.name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /in/health
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      serviceAccountName: {{.Values.deployment.serviceAccount}}
+      envFrom:
+        - configMapRef:
+            name: kaj-prd-wuzapi-srvc-config
+      volumeMounts:
+        - name: kaj-wuzapi-helm-storage
+          mountPath: /app/dbdata
+          subPath: dbdata
+        - name: kaj-wuzapi-helm-storage
+          mountPath: /app/files
+          subPath: files
+    volumes:
+      - name: kaj-wuzapi-helm-storage
+        persistentVolumeClaim:
+          claimName: kaj-prd-wuzapi-helm-pvc
+  strategy:
+    blueGreen:
+      activeService: {{ .Values.deployment.name }}
+      previewService: {{ .Values.deployment.name }}-green
+      autoPromotionEnabled: {{ .Values.deployment.autoPromote }}
+      scaleDownDelaySeconds: {{ .Values.deployment.delayPromote }}

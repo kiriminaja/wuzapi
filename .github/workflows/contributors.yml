@@ -1,7 +1,5 @@
 name: Update Contributors
 on:
-  schedule:
-    - cron: "0 0 * * *" # Runs daily
   workflow_dispatch: # Allows manual triggering
 jobs:
   update-contributors:
